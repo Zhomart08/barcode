@@ -1,14 +1,11 @@
-package kz.kazimpex.sed.barcode.services;
+package kz.kazimpex.sed.barcode.scanners;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -51,11 +48,15 @@ public class PdDocumentBarcodeScanner {
     }
 
 
-    public void displayResults() {
+    public String getBarcode() {
+
+        String barcode = null;
 
         for (PdPageBarcodeScanner pageScanner : pageScannerList) {
-            pageScanner.displayResults();
+            barcode = pageScanner.getBarcode();
         }
+
+        return barcode;
     }
 
 }

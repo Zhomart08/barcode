@@ -1,4 +1,4 @@
-package kz.kazimpex.sed.barcode.services;
+package kz.kazimpex.sed.barcode.scanners;
 
 import com.google.zxing.*;
 import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
@@ -61,7 +61,7 @@ public class PdPageBarcodeScanner {
         this.resultList = new ArrayList<Result>();
 
 		/*
-		 * build default bar code reader
+         * build default bar code reader
 		 */
         this.dataMatrixReader = new DataMatrixReader();
         this.reader = new GenericMultipleBarcodeReader(dataMatrixReader);
@@ -71,23 +71,17 @@ public class PdPageBarcodeScanner {
     }
 
 
-
-
     public void scan() throws IOException {
         PDResources pdResources = pdPage.getResources();
 
         Map<String, PDXObject> xobjects = (Map<String, PDXObject>) pdResources.getXObjects();
-        if (xobjects != null)
-        {
-            for (String key : xobjects.keySet())
-            {
+        if (xobjects != null) {
+            for (String key : xobjects.keySet()) {
                 PDXObject xobject = xobjects.get(key);
-                if (xobject instanceof PDXObjectImage)
-                {
+                if (xobject instanceof PDXObjectImage) {
                     PDXObjectImage imageObject = (PDXObjectImage) xobject;
                     String suffix = imageObject.getSuffix();
-                    if (suffix != null)
-                    {
+                    if (suffix != null) {
 //                        if ("jpx".equals(suffix))
 //                        {
 //                            suffix = "JPEG2000";
@@ -101,16 +95,18 @@ public class PdPageBarcodeScanner {
         }
     }
 
-    public void displayResults() {
+    public String getBarcode() {
+        String barcode = null;
         for (Result result : resultList) {
-            System.out.println("page=" + pageNumber + ", barcodeFormat=" + result.getBarcodeFormat() + ", value=" + result.getText());
+            barcode = result.getText();
         }
+
+        return barcode;
     }
 
 
     /**
      * get area list by color
-     *
      *
      * @param in
      * @param out
@@ -118,7 +114,7 @@ public class PdPageBarcodeScanner {
      * @param greenColor
      * @param blueColor
      * @param maximumBlankPixelDelimiterCount define the same area until number of blank pixel
-     *        is not greater than maximumBlankPixelDelimiterCount
+     *                                        is not greater than maximumBlankPixelDelimiterCount
      * @return
      * @throws IOException
      */
@@ -130,8 +126,7 @@ public class PdPageBarcodeScanner {
             int blueColor,
             int maximumBlankPixelDelimiterCount,
             boolean debug)
-            throws IOException
-    {
+            throws IOException {
         int w = in.getWidth();
         int h = in.getHeight();
         int pixel;
@@ -139,7 +134,7 @@ public class PdPageBarcodeScanner {
 
         Graphics2D gc = null;
 
-        if (out != null){
+        if (out != null) {
             gc = out.createGraphics();
             gc.setColor(new Color(1f, 0f, 0f));
         }
@@ -149,16 +144,15 @@ public class PdPageBarcodeScanner {
         for (int x = 0; x < w; x++) {
             for (int y = 0; y < h; y++) {
                 pixel = in.getRGB(x, y);
-                int alpha = ((pixel >>24 ) & 0xFF);
-                int red = ((pixel >>16 ) & 0xFF);
-                int green = ((pixel >>8 ) & 0xFF);
+                int alpha = ((pixel >> 24) & 0xFF);
+                int red = ((pixel >> 16) & 0xFF);
+                int green = ((pixel >> 8) & 0xFF);
                 int blue = (pixel & 0xFF);
 
 
                 if (red == redColor
                         && green == greenColor
-                        && blue == blueColor)
-                {
+                        && blue == blueColor) {
                     Rectangle rect
                             = new Rectangle(
                             x - maximumBlankPixelDelimiterCount,
@@ -168,17 +162,15 @@ public class PdPageBarcodeScanner {
 
 
                     boolean isInArea = false;
-                    for(Rectangle rectangle : areaList){
-                        if(rectangle.contains(x, y))
-                        {
+                    for (Rectangle rectangle : areaList) {
+                        if (rectangle.contains(x, y)) {
                             rectangle.add(rect);
                             isInArea = true;
                             break;
                         }
                     }
 
-                    if (isInArea)
-                    {
+                    if (isInArea) {
                         continue;
                     }
 
@@ -187,15 +179,14 @@ public class PdPageBarcodeScanner {
 					 */
                     pixel = pixel & 0x00000000;
                     pixel = pixel | (alpha << 24);
-                    pixel = pixel | (0 <<16);
-                    pixel = pixel | (255 <<8);
+                    pixel = pixel | (0 << 16);
+                    pixel = pixel | (255 << 8);
                     pixel = pixel | (0);
 
                     isInArea = false;
                     for (Rectangle rectangle : areaList) {
                         Rectangle intersection = rectangle.intersection(rect);
-                        if(intersection.width > 0 && intersection.height > 0)
-                        {
+                        if (intersection.width > 0 && intersection.height > 0) {
                             isInArea = true;
                             rectangle.add(rect);
 
@@ -207,18 +198,15 @@ public class PdPageBarcodeScanner {
                         areaList.add(rect);
                     }
 
-                    while (isInArea)
-                    {
+                    while (isInArea) {
                         Rectangle rectToRemove = null;
                         isInArea = false;
-                        for (Rectangle rectangle : areaList){
-                            for(Rectangle rec2 : areaList)
-                            {
-                                if(rec2 == rectangle) continue;
+                        for (Rectangle rectangle : areaList) {
+                            for (Rectangle rec2 : areaList) {
+                                if (rec2 == rectangle) continue;
 
                                 Rectangle intersection = rectangle.intersection(rec2);
-                                if (intersection.width > 0 && intersection.height > 0)
-                                {
+                                if (intersection.width > 0 && intersection.height > 0) {
                                     if (debug) {
                                         System.out.println(rectangle + " intersect " + rec2);
                                     }
@@ -250,12 +238,10 @@ public class PdPageBarcodeScanner {
     }
 
 
-
     public static ArrayList<Rectangle> getAreaList(
             BufferedImage image,
             int maximumBlankPixelDelimiterCount)
-            throws IOException
-    {
+            throws IOException {
 //		BufferedImage out = copy(image, BufferedImage.TYPE_INT_ARGB);
         ArrayList<Rectangle> areaList
                 = getAllAreaByColor(
@@ -273,8 +259,7 @@ public class PdPageBarcodeScanner {
     public void extractBarcodeArrayByAreas(
             BufferedImage image,
             int maximumBlankPixelDelimiterCount)
-            throws IOException
-    {
+            throws IOException {
         BufferedImage blackAndWhiteImage = getThresholdImage(image);
         ArrayList<Rectangle> areaList = getAreaList(blackAndWhiteImage, maximumBlankPixelDelimiterCount);
 
@@ -332,23 +317,22 @@ public class PdPageBarcodeScanner {
         }
     }
 
-    public Result[] extractBarcodeArray2(BufferedImage bufferedImage)
-    {
+    public Result[] extractBarcodeArray2(BufferedImage bufferedImage) {
         Result[] results = null;
 
         try {
             LuminanceSource source = new BufferedImageLuminanceSource(bufferedImage);
             BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
             results = reader.decodeMultiple(bitmap, decodeHintTypes);
-        } catch (NotFoundException e) {}
+        } catch (NotFoundException e) {
+        }
 
         return results;
     }
 
 
     public static Result[] extractBarcodeArray(
-            BufferedImage bufferedImage)
-    {
+            BufferedImage bufferedImage) {
         Result[] results = null;
 
         try {
@@ -359,12 +343,11 @@ public class PdPageBarcodeScanner {
             results = new Result[1];
             results[0] = result;
             return results;
-        } catch (Exception e) {}
+        } catch (Exception e) {
+        }
 
         return results;
     }
-
-
 
 
     public static BufferedImage rotate180Image(BufferedImage inputImage, int imageType) {
@@ -408,7 +391,7 @@ public class PdPageBarcodeScanner {
         BufferedImage returnImage = new BufferedImage(height, width, imageType);
 
         for (int x = 0; x < width; x++) {
-            for(int y = 0; y < height; y++) {
+            for (int y = 0; y < height; y++) {
                 returnImage.setRGB(
                         y,
                         width - x - 1,
@@ -420,8 +403,7 @@ public class PdPageBarcodeScanner {
 
     public static BufferedImage getBlackAndWhiteImage(
             BufferedImage image)
-            throws IOException
-    {
+            throws IOException {
         int width = image.getWidth();
         int height = image.getHeight();
         BufferedImage imageBW = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_BINARY);
@@ -429,13 +411,12 @@ public class PdPageBarcodeScanner {
         g.drawRenderedImage(image, null);
         g.dispose();
 
-        return  imageBW;
+        return imageBW;
     }
 
     public static BufferedImage getThresholdImage(
             BufferedImage image)
-            throws IOException
-    {
+            throws IOException {
         float saturationMin = 0.10f;
         float brightnessMin = 0.80f;
         BufferedImage thresholdImage = copyImage(image, BufferedImage.TYPE_INT_ARGB);
@@ -450,8 +431,7 @@ public class PdPageBarcodeScanner {
             BufferedImage out,
             float saturationMin,
             float brightnessMin)
-            throws IOException
-    {
+            throws IOException {
         int w = in.getWidth();
         int h = in.getHeight();
         int pixel;
@@ -461,18 +441,17 @@ public class PdPageBarcodeScanner {
             for (int y = 0; y < h; y++) {
                 pixel = in.getRGB(x, y);
 
-                int alpha = ((pixel >>24 ) & 0xFF);
-                int red = ((pixel >>16 ) & 0xFF);
-                int green = ((pixel >>8 ) & 0xFF);
+                int alpha = ((pixel >> 24) & 0xFF);
+                int red = ((pixel >> 16) & 0xFF);
+                int green = ((pixel >> 8) & 0xFF);
                 int blue = (pixel & 0xFF);
 
                 Color.RGBtoHSB(red, green, blue, hsb);
 
-                if( hsb[2] < brightnessMin
-                        || (hsb[2] >= brightnessMin &&  hsb[1] >= saturationMin)
+                if (hsb[2] < brightnessMin
+                        || (hsb[2] >= brightnessMin && hsb[1] >= saturationMin)
                     // (red +  green + blue > iThreshold *3 )
-                        )
-                {
+                        ) {
                     red = 0;
                     green = 0;
                     blue = 0;
@@ -482,10 +461,10 @@ public class PdPageBarcodeScanner {
                     blue = 255;
                 }
                 pixel = pixel & 0x00000000;
-                pixel = pixel | (alpha <<24 );
-                pixel = pixel | (red <<16 );
-                pixel = pixel | (green <<8 );
-                pixel = pixel | (blue  );
+                pixel = pixel | (alpha << 24);
+                pixel = pixel | (red << 16);
+                pixel = pixel | (green << 8);
+                pixel = pixel | (blue);
 
                 out.setRGB(x, y, pixel);
             }

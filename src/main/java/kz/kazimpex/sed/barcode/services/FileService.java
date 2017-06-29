@@ -1,35 +1,19 @@
 package kz.kazimpex.sed.barcode.services;
 
-import com.aspose.barcode.barcoderecognition.BarCodeReadType;
-import com.aspose.barcode.barcoderecognition.BarCodeReader;
-import com.aspose.pdf.facades.PdfExtractor;
 import com.google.zxing.*;
-import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
-import com.google.zxing.common.HybridBinarizer;
 import com.itextpdf.text.Document;
-import com.itextpdf.text.pdf.PdfCopy;
-import com.itextpdf.text.pdf.PdfImportedPage;
-import com.itextpdf.text.pdf.PdfReader;
-import com.itextpdf.text.pdf.PdfWriter;
-import com.mongodb.DBObject;
+import com.itextpdf.text.pdf.*;
 import com.mongodb.gridfs.GridFSFile;
 import kz.kazimpex.sed.barcode.repositories.FileRepository;
-import org.apache.pdfbox.io.IOUtils;
-
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-
-import org.apache.pdfbox.pdmodel.common.PDStream;
+import kz.kazimpex.sed.barcode.scanners.PdDocumentBarcodeScanner;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.io.*;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
@@ -42,43 +26,57 @@ public class FileService {
     @Autowired
     FileRepository fileRepository;
 
+    @Transactional
     public void uploadFile(MultipartFile file) throws Exception {
-        readTextFromPage(file.getInputStream());
-        // fileRepository.upload(file);
+        GridFSFile gridFSFile = fileRepository.upload(file);
+        splitPdfByBarcode(file.getInputStream());
+    }
+
+    public void uploadSeperatedFile(byte[] source) {
+        ByteArrayInputStream bis = new ByteArrayInputStream(source);
+        fileRepository.upload(bis);
     }
 
 
-    public void readTextFromPage(InputStream inputStream) throws Exception {
-
+    public void splitPdfByBarcode(InputStream inputStream) throws Exception {
         try {
-
             PdfReader reader = new PdfReader(inputStream);
-            int n = reader.getNumberOfPages();
-            System.out.println("Number of pages : " + n);
-            int i = 0;
-            while (i < n) {
-                String outFile = "src/main/resources/" + 1 + "blank.pdf";
-                //System.out.println("Writing " + outFile);
-                Document document = new Document(reader.getPageSizeWithRotation(1));
+            Document document = new Document(reader.getPageSizeWithRotation(1));
 
+            List<InputStream> streamOfPDFFiles = null;
+            for (int i = 0; i < reader.getNumberOfPages(); i++) {
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 PdfCopy writer = new PdfCopy(document, baos);
                 document.open();
-                PdfImportedPage page = writer.getImportedPage(reader, ++i);
+                PdfImportedPage page = writer.getImportedPage(reader, i + 1);
                 writer.addPage(page);
                 document.close();
                 writer.close();
 
                 byte[] documentBytes = baos.toByteArray();
+                String barcode = recognizeBarcode(documentBytes);
+                System.out.println("=====barcode: " + barcode);
 
-                //  convertToFile(documentBytes, i);
+                if (barcode != null) {
+                    if (streamOfPDFFiles != null) {
+                        byte[] concatedPDFsBytes = concatPDFs(streamOfPDFFiles, false, i);
+                        uploadSeperatedFile(concatedPDFsBytes);
+                        convertToFile(concatedPDFsBytes, i);
+                    }
 
+                    streamOfPDFFiles = new ArrayList();
+                    streamOfPDFFiles.add(new ByteArrayInputStream(documentBytes));
 
-                if (i == 2) {
-                    parseBarcode(documentBytes);
+                } else {
+                    streamOfPDFFiles.add(new ByteArrayInputStream(documentBytes));
                 }
 
+                if (i == reader.getNumberOfPages() - 1) {
 
+                    byte[] concatedPDFsBytes = concatPDFs(streamOfPDFFiles, false, i);
+                    uploadSeperatedFile(concatedPDFsBytes);
+                    convertToFile(concatedPDFsBytes, i);
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -87,27 +85,100 @@ public class FileService {
 
     }
 
-    public void convertToFile(byte[] buffer, int i) throws Exception {
 
-        File targetFile = new File("src/main/resources/" + i + "tarFile.pdf");
-        OutputStream outStream = new FileOutputStream(targetFile);
-        outStream.write(buffer);
-    }
-
-
-    public void parseBarcode(byte[] bytes) throws NotFoundException, IOException {
-
+    public String recognizeBarcode(byte[] bytes) throws NotFoundException, IOException {
         ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
         PdDocumentBarcodeScanner scanner = new PdDocumentBarcodeScanner(bis);
         scanner.scan();
-        long endTime = System.currentTimeMillis();
+        return scanner.getBarcode();
+    }
 
-
-
-        scanner.displayResults();
-
-
+    public void convertToFile(byte[] buffer, int i) throws Exception {
+        File targetFile = new File("src/main/resources/" + i + "tarFile.pdf");
+        OutputStream outStream = new FileOutputStream(targetFile);
+        outStream.write(buffer);
+        outStream.flush();
+        outStream.close();
     }
 
 
+    public byte[] concatPDFs(List<InputStream> streamOfPDFFiles,
+                             boolean paginate, int i) throws Exception {
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+
+        Document document = new Document();
+        try {
+            List<InputStream> pdfs = streamOfPDFFiles;
+            List<PdfReader> readers = new ArrayList<PdfReader>();
+            int totalPages = 0;
+            Iterator<InputStream> iteratorPDFs = pdfs.iterator();
+
+            // Create Readers for the pdfs.
+            while (iteratorPDFs.hasNext()) {
+                InputStream pdf = iteratorPDFs.next();
+                PdfReader pdfReader = new PdfReader(pdf);
+                readers.add(pdfReader);
+                totalPages += pdfReader.getNumberOfPages();
+            }
+            // Create a writer for the outputstream
+            PdfWriter writer = PdfWriter.getInstance(document, outputStream);
+
+            document.open();
+            BaseFont bf = BaseFont.createFont(BaseFont.HELVETICA,
+                    BaseFont.CP1252, BaseFont.NOT_EMBEDDED);
+            PdfContentByte cb = writer.getDirectContent(); // Holds the PDF data
+
+            PdfImportedPage page;
+            int currentPageNumber = 0;
+            int pageOfCurrentReaderPDF = 0;
+            Iterator<PdfReader> iteratorPDFReader = readers.iterator();
+
+            // Loop through the PDF files and add to the output.
+            while (iteratorPDFReader.hasNext()) {
+                PdfReader pdfReader = iteratorPDFReader.next();
+
+                // Create a new page in the target for each source page.
+                while (pageOfCurrentReaderPDF < pdfReader.getNumberOfPages()) {
+                    document.newPage();
+                    pageOfCurrentReaderPDF++;
+                    currentPageNumber++;
+                    page = writer.getImportedPage(pdfReader,
+                            pageOfCurrentReaderPDF);
+                    cb.addTemplate(page, 0, 0);
+
+                    // Code for pagination.
+                    if (paginate) {
+                        cb.beginText();
+                        cb.setFontAndSize(bf, 9);
+                        cb.showTextAligned(PdfContentByte.ALIGN_CENTER, ""
+                                        + currentPageNumber + " of " + totalPages, 520,
+                                5, 0);
+                        cb.endText();
+                    }
+                }
+                pageOfCurrentReaderPDF = 0;
+            }
+            outputStream.flush();
+            document.close();
+            outputStream.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (document.isOpen())
+                document.close();
+            try {
+                if (outputStream != null)
+                    outputStream.close();
+            } catch (IOException ioe) {
+                ioe.printStackTrace();
+            }
+        }
+
+        return outputStream.toByteArray();
+    }
 }
+
+
+
