@@ -3,11 +3,22 @@ package kz.kazimpex.sed.barcode.services;
 import com.google.zxing.*;
 import com.itextpdf.text.Document;
 import com.itextpdf.text.pdf.*;
+import com.mongodb.BasicDBObject;
+import com.mongodb.DBObject;
+import com.mongodb.gridfs.GridFSDBFile;
 import com.mongodb.gridfs.GridFSFile;
+import kz.kazimpex.common.dto.RestResponseDto;
+import kz.kazimpex.sed.barcode.dtos.FileDetailDto;
 import kz.kazimpex.sed.barcode.repositories.FileRepository;
 import kz.kazimpex.sed.barcode.scanners.PdDocumentBarcodeScanner;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,24 +37,67 @@ public class FileService {
     @Autowired
     FileRepository fileRepository;
 
+
+    public List<FileDetailDto> getFilesDatesHirarhially() {
+        List<GridFSDBFile> parents = fileRepository.getAllParents();
+        List<FileDetailDto> fileDetailList = new ArrayList<>();
+        for (GridFSDBFile file : parents) {
+            FileDetailDto dto = new FileDetailDto(file);
+            dto.setChildren(convertToDtoList(fileRepository.getByParentId(file.getId().toString())));
+            fileDetailList.add(dto);
+        }
+        return fileDetailList;
+    }
+
+    @Transactional
+    public RestResponseDto deleteFileDetail(String fileID) {
+        if (fileRepository.delete(fileID)) {
+            return new RestResponseDto().createSuccessDeleted();
+        }
+        return new RestResponseDto().createErrorDeleted();
+    }
+
+
+    public List<FileDetailDto> getNotAttachedByBarcode(String barcode) {
+        return convertToDtoList(fileRepository.getNotAttachedByBarcode(barcode));
+    }
+
+    public ResponseEntity<InputStreamResource> findById(String fileId) {
+        GridFSDBFile file = fileRepository.findById(fileId);
+        file.getMetaData().put("attached", true);
+        file.save();
+        return ResponseEntity.ok()
+                .contentLength(file.getLength())
+                .contentType(MediaType.parseMediaType(file.getContentType()))
+                .header("filename", file.getFilename())
+                .body(new InputStreamResource(file.getInputStream()));
+    }
+
+    public List<FileDetailDto> getFileDetailList() {
+        return convertToDtoList(fileRepository.getAllFiles());
+    }
+
     @Transactional
     public void uploadFile(MultipartFile file) throws Exception {
         GridFSFile gridFSFile = fileRepository.upload(file);
-        splitPdfByBarcode(file.getInputStream());
+        splitPdfByBarcode(file.getInputStream(), gridFSFile.getId().toString());
     }
 
-    public void uploadSeperatedFile(byte[] source) {
+    public void uploadSeperatedFile(byte[] source, DBObject dbObject, String fileName) {
         ByteArrayInputStream bis = new ByteArrayInputStream(source);
-        fileRepository.upload(bis);
+        fileRepository.upload(bis, dbObject, fileName);
     }
 
 
-    public void splitPdfByBarcode(InputStream inputStream) throws Exception {
+    public void splitPdfByBarcode(InputStream inputStream, String parentId) throws Exception {
         try {
             PdfReader reader = new PdfReader(inputStream);
             Document document = new Document(reader.getPageSizeWithRotation(1));
 
             List<InputStream> streamOfPDFFiles = null;
+
+            String lastBarcode = null;
+
             for (int i = 0; i < reader.getNumberOfPages(); i++) {
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 PdfCopy writer = new PdfCopy(document, baos);
@@ -60,10 +114,12 @@ public class FileService {
                 if (barcode != null) {
                     if (streamOfPDFFiles != null) {
                         byte[] concatedPDFsBytes = concatPDFs(streamOfPDFFiles, false, i);
-                        uploadSeperatedFile(concatedPDFsBytes);
+                        DBObject dbObject = generateDBObject(parentId, lastBarcode);
+                        uploadSeperatedFile(concatedPDFsBytes, dbObject, lastBarcode);
                         convertToFile(concatedPDFsBytes, i);
                     }
 
+                    lastBarcode = barcode;
                     streamOfPDFFiles = new ArrayList();
                     streamOfPDFFiles.add(new ByteArrayInputStream(documentBytes));
 
@@ -74,7 +130,8 @@ public class FileService {
                 if (i == reader.getNumberOfPages() - 1) {
 
                     byte[] concatedPDFsBytes = concatPDFs(streamOfPDFFiles, false, i);
-                    uploadSeperatedFile(concatedPDFsBytes);
+                    DBObject dbObject = generateDBObject(parentId, lastBarcode);
+                    uploadSeperatedFile(concatedPDFsBytes, dbObject, lastBarcode);
                     convertToFile(concatedPDFsBytes, i);
                 }
             }
@@ -83,6 +140,33 @@ public class FileService {
         }
 
 
+    }
+
+    public DBObject generateDBObject(String parentId, String barcode) {
+        DBObject extra = new BasicDBObject();
+        extra.put("parent_id", parentId);
+        extra.put("barcode", barcode);
+        extra.put("created_date", new java.util.Date());
+        extra.put("attached", false);
+        return extra;
+
+
+    }
+
+    private FileDetailDto convertToDtoList(GridFSDBFile gridFSDBFile, List<FileDetailDto> children) {
+        List<FileDetailDto> fileDetailList = new ArrayList<>();
+        FileDetailDto dto = new FileDetailDto(gridFSDBFile);
+        dto.setChildren(children);
+        fileDetailList.add(dto);
+        return dto;
+    }
+
+    private List<FileDetailDto> convertToDtoList(List<GridFSDBFile> gridFSDBFilesList) {
+        List<FileDetailDto> fileDetailList = new ArrayList<>();
+        for (GridFSDBFile file : gridFSDBFilesList) {
+            fileDetailList.add(new FileDetailDto(file));
+        }
+        return fileDetailList;
     }
 
 
