@@ -12,15 +12,18 @@ import kz.kazimpex.sed.barcode.dtos.FileDetailDto;
 import kz.kazimpex.sed.barcode.repositories.FileRepository;
 import kz.kazimpex.sed.barcode.scanners.PdDocumentBarcodeScanner;
 
+import org.apache.tomcat.util.http.fileupload.IOUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
@@ -36,6 +39,33 @@ public class FileService {
 
     @Autowired
     FileRepository fileRepository;
+
+
+    public HttpEntity<byte[]> downloadFileById(String fileId) {
+        HttpHeaders headers = new HttpHeaders();
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            GridFSDBFile file = fileRepository.findById(fileId);
+            IOUtils.copy(file.getInputStream(), out);
+            byte[] photo = out.toByteArray();
+
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentLength(photo.length);
+            return new HttpEntity<byte[]>(photo, headers);
+        } catch (Exception e) {
+
+        }
+        return new HttpEntity<byte[]>(null, headers);
+    }
+
+    @Transactional
+    public List<FileDetailDto> uploadFileList(List<MultipartFile> fileList) throws Exception {
+        List<FileDetailDto> fileDetailList = new ArrayList<>();
+        for (int i = 0; i < fileList.size(); i++) {
+            uploadFile(fileList.get(i));
+        }
+        return fileDetailList;
+    }
 
 
     public List<FileDetailDto> getFilesDatesHirarhially() {

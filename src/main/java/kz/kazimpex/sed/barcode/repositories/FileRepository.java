@@ -25,8 +25,6 @@ public class FileRepository {
     GridFsTemplate gridFsTemplate;
 
 
-
-
     public List<GridFSDBFile> getAllFiles() {
         return gridFsTemplate.find(null);
     }
@@ -68,6 +66,8 @@ public class FileRepository {
 
     @Transactional
     public GridFSFile upload(MultipartFile multipartFile) {
+
+        System.out.println("upload is called ...........");
         try {
             return gridFsTemplate.store(multipartFile.getInputStream(), multipartFile.getOriginalFilename(), multipartFile.getContentType());
         } catch (Exception e) {
