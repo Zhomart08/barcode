@@ -60,6 +60,7 @@ public class FileController {
 
     @GetMapping(value = "/{fileId}")
     public ResponseEntity<InputStreamResource> getById(@PathVariable String fileId) {
+        System.out.println(" getById ==============================================: " + fileId);
         return fileService.findById(fileId);
     }
 
