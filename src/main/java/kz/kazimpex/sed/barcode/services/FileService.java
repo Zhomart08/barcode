@@ -40,6 +40,14 @@ public class FileService {
     @Autowired
     FileRepository fileRepository;
 
+    public void setNotAttached(String fileId) {
+        GridFSDBFile file = fileRepository.findById(fileId);
+        file.getMetaData().put("attached", false);
+        file.save();
+
+
+    }
+
 
     public HttpEntity<byte[]> downloadFileById(String fileId) {
         HttpHeaders headers = new HttpHeaders();

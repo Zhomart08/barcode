@@ -65,6 +65,13 @@ public class FileController {
     }
 
 
+    @GetMapping(value = "/notAttached/{fileId}")
+    public void setNotAttached(@PathVariable String fileId) {
+        System.out.println(" setNotAttached is called  ==============================================: " + fileId);
+        fileService.setNotAttached(fileId);
+    }
+
+
     @GetMapping(value = "/list/{fileType}/{elementId}")
     public List<FileDetailDto> getFileDetailList() {
         return fileService.getFileDetailList();
