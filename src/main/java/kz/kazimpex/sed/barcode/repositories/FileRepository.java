@@ -3,6 +3,7 @@ package kz.kazimpex.sed.barcode.repositories;
 import com.mongodb.DBObject;
 import com.mongodb.gridfs.GridFSDBFile;
 import com.mongodb.gridfs.GridFSFile;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -13,7 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.util.List;
+
+import static java.nio.charset.StandardCharsets.ISO_8859_1;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Created by Жолдасбеков Жомарт on 27.06.2017.
@@ -66,10 +71,8 @@ public class FileRepository {
 
     @Transactional
     public GridFSFile upload(MultipartFile multipartFile) {
-
-        System.out.println("upload is called ...........");
         try {
-            return gridFsTemplate.store(multipartFile.getInputStream(), multipartFile.getOriginalFilename(), multipartFile.getContentType());
+            return gridFsTemplate.store(multipartFile.getInputStream(), StringEscapeUtils.unescapeJava(multipartFile.getName()), multipartFile.getContentType());
         } catch (Exception e) {
             System.out.println(e);
         }

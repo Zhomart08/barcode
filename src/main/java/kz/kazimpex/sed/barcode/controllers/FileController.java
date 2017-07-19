@@ -35,7 +35,7 @@ public class FileController {
     @Autowired
     FileRepository fileRepository;
 
-    @PostMapping(value = "/upload/list/{fileType}/{elementId}")
+    @PostMapping(value = "/upload/list/{fileType}/{elementId}" , consumes = "multipart/form-data; charset=utf-8")
     public List<FileDetailDto> uploadFile(@PathVariable String fileType,
                                           @PathVariable String elementId,
                                           MultipartHttpServletRequest request) throws Exception {

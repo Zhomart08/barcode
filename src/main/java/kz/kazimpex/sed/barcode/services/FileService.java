@@ -117,6 +117,8 @@ public class FileService {
 
     @Transactional
     public void uploadFile(MultipartFile file) throws Exception {
+        System.out.println("file name=============================> " + file.getName());
+
         GridFSFile gridFSFile = fileRepository.upload(file);
         splitPdfByBarcode(file.getInputStream(), gridFSFile.getId().toString());
     }
