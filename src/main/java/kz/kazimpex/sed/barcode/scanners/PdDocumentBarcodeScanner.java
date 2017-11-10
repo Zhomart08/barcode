@@ -3,6 +3,7 @@ package kz.kazimpex.sed.barcode.scanners;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -18,8 +19,9 @@ public class PdDocumentBarcodeScanner {
     List<PdPageBarcodeScanner> pageScannerList;
 
     public PdDocumentBarcodeScanner(InputStream inputStream) throws IOException {
-        //FileInputStream pdfInputStream = new FileInputStream(file);
-        this.pdDocument = PDDocument.load(inputStream);
+        //FileInputStream pdfInputStream = new FileInputStream(inputStream);
+        //this.pdDocument = PDDocument.load(inputStream);
+        this.pdDocument = PDDocument.loadNonSeq(inputStream, null);
         inputStream.close();
 
         pageScannerList = new ArrayList<PdPageBarcodeScanner>();
@@ -28,6 +30,7 @@ public class PdDocumentBarcodeScanner {
 
     public void scan() throws IOException {
         List<PDPage> pages = pdDocument.getDocumentCatalog().getAllPages();
+        System.out.println("pages size: " + pages.size());
         int pageNumber = 0;
 
 

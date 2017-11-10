@@ -148,7 +148,18 @@ public class FileService {
                 writer.close();
 
                 byte[] documentBytes = baos.toByteArray();
-                String barcode = recognizeBarcode(documentBytes);
+
+                String barcode = null;
+                try {
+
+                    barcode = recognizeBarcode(documentBytes);
+
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+
+                }
+
+
                 System.out.println("=====barcode: " + barcode);
 
                 if (barcode != null) {
@@ -164,6 +175,9 @@ public class FileService {
                     streamOfPDFFiles.add(new ByteArrayInputStream(documentBytes));
 
                 } else {
+                    if (streamOfPDFFiles == null) {
+                        streamOfPDFFiles = new ArrayList();
+                    }
                     streamOfPDFFiles.add(new ByteArrayInputStream(documentBytes));
                 }
 
@@ -211,7 +225,11 @@ public class FileService {
 
 
     public String recognizeBarcode(byte[] bytes) throws NotFoundException, IOException {
+
+        System.out.println("bytes: " + bytes);
         ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
+
+        System.out.println("bis: " + bis);
         PdDocumentBarcodeScanner scanner = new PdDocumentBarcodeScanner(bis);
         scanner.scan();
         return scanner.getBarcode();

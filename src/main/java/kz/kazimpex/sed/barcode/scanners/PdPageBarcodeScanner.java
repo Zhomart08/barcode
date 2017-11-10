@@ -72,22 +72,47 @@ public class PdPageBarcodeScanner {
 
 
     public void scan() throws IOException {
+
+        System.out.println("scan is called...........");
+
         PDResources pdResources = pdPage.getResources();
+        System.out.println("pdResources===========: " + pdResources);
 
         Map<String, PDXObject> xobjects = (Map<String, PDXObject>) pdResources.getXObjects();
+
+
+        System.out.println("xobjects============> : " + xobjects);
+
         if (xobjects != null) {
             for (String key : xobjects.keySet()) {
                 PDXObject xobject = xobjects.get(key);
                 if (xobject instanceof PDXObjectImage) {
                     PDXObjectImage imageObject = (PDXObjectImage) xobject;
+
+
                     String suffix = imageObject.getSuffix();
+
+                    System.out.println(" suffix: " + suffix);
                     if (suffix != null) {
-//                        if ("jpx".equals(suffix))
-//                        {
-//                            suffix = "JPEG2000";
-//                        }
+                        if ("jpx".equals(suffix)) {
+                            suffix = "JPEG2000";
+                        }
+
+                        System.out.println("imageObject.getHeight(): " + imageObject.getHeight());
+                        System.out.println("imageObject.getWidth(): " + imageObject.getWidth());
+
+//                        imageObject.setHeight(400);
+//                        imageObject.setHeight(914);
+
 
                         BufferedImage image = imageObject.getRGBImage();
+
+                        if (image == null) {
+                            System.out.println("image is null we will parse another page!");
+                            return;
+                        }
+
+                        System.out.println(" BufferedImage image :" + image);
                         extractBarcodeArrayByAreas(image, this.maximumBlankPixelDelimiterCount);
                     }
                 }
@@ -175,7 +200,7 @@ public class PdPageBarcodeScanner {
                     }
 
 					/*
-					 * get pixel colors
+                     * get pixel colors
 					 */
                     pixel = pixel & 0x00000000;
                     pixel = pixel | (alpha << 24);
@@ -260,13 +285,16 @@ public class PdPageBarcodeScanner {
             BufferedImage image,
             int maximumBlankPixelDelimiterCount)
             throws IOException {
+
+        System.out.println("image=======: " + image);
+
         BufferedImage blackAndWhiteImage = getThresholdImage(image);
         ArrayList<Rectangle> areaList = getAreaList(blackAndWhiteImage, maximumBlankPixelDelimiterCount);
 
         for (Rectangle rectangle : areaList) {
 
 			/*
-			 * verify bounds before crop image
+             * verify bounds before crop image
 			 */
             if (rectangle.x < 0) {
                 rectangle.x = 0;
@@ -285,7 +313,7 @@ public class PdPageBarcodeScanner {
             }
 
 			/*
-			 * crop image to extract barcodes
+             * crop image to extract barcodes
 			 */
             BufferedImage croppedImage =
                     image.getSubimage(
@@ -296,7 +324,7 @@ public class PdPageBarcodeScanner {
 
 
 			/*
-			 * zxing library can not deals with DataMatrix in all orientations, so
+             * zxing library can not deals with DataMatrix in all orientations, so
 			 * we have to rotate the image and ask zxing four times to find DataMatrix
 			 */
             addResults(extractBarcodeArray(croppedImage));
